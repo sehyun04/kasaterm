@@ -57,6 +57,23 @@ bash scripts/build-app.sh      # dist/kasaterm.app 을 새로 굽는다
 - 자기 설치는 **그 설치본으로 도는 앱**에서만, **빌드 트리의 번들이 더 새로울 때만** 움직인다. `cargo run` 개발 실행과 배포된 남의 머신에서는 아무 일도 안 한다.
 - ⚠️ **앱을 claude 세션 안에서 띄우지 마라**(pane 에서 `open`·relaunch). 그 앱이 claude 의 `CLAUDE_CODE_CHILD_SESSION`·`TEAMMATE_MODE`·`SESSION_ID` 를 물려받고, 그러면 그 앱이 낳는 **모든 pane** 의 claude 가 transcript 저장을 끈다. `scrub_inherited_claude_markers`(main.rs, 부팅 첫 줄)가 이제 그걸 지우지만, 애초에 안 물리는 게 낫다.
 
+## Windows 포트 인수인계 (2026-08-14)
+
+`windows-port` 브랜치의 Windows 핵심 기능 수정은 완료됐다. 거노가 실제 Windows 앱에서 다음 항목을 확인했다.
+
+- 한글 IME 입력 정상
+- PowerShell과 Git Bash에서 Claude 실행 정상
+- Claude 실행 시 학생 배정, 캐릭터 표시, 아로나 연동 정상
+- 왼쪽 패널의 추가 메뉴 정상
+- UTF-8 한글 출력 정상
+- 작은 pane의 최초 복원, Alt+Tab 복귀, 불필요한 위쪽 scrollback, 주기적 화면 깨짐 해결
+
+작은 pane 복원 문제의 마지막 원인은 복원 시 모든 PTY를 전체 창 크기로 먼저 생성한 뒤 줄이던 순서였다. `restore_window_layout_at`이 split 트리의 leaf 크기를 먼저 계산해 각 PTY를 실제 pane 크기로 생성한다. Claude pane은 저장된 일반 scrollback을 다시 주입하지 않으며, resize 중 서로 다른 크기의 화면 업데이트를 합치지 않는다. 이 동작을 되돌리면 좁은 pane에서 171열 출력이 40열 화면에 찢어지는 회귀가 다시 생긴다.
+
+Windows 수정 커밋은 최신 upstream `main` 위로 rebase했다. `cargo check -p kasaterm`과 agent/shell scrollback 복원 회귀 테스트가 통과했고, upstream PR은 `https://github.com/2rami/kasaterm/pull/2`다.
+
+요청 범위에서 Windows 배포 패키징은 제외됐다. PR #2에는 기능 수정과 이 인수인계만 남기며, MSI/portable ZIP 스크립트나 release workflow 변경을 다시 넣지 말 것. 아직 하지 않은 것은 PR 병합이다.
+
 ## 함정·배경·수정 주의점은 메모리에
 
 렌더러/색 파이프라인·아키텍처 배경, 렌더버그 디버깅 카탈로그, 코드 수정 주의점(PTY reader **`try_send` 필수** 등), 성능 히스토리는 CLAUDE.md 에 중복해 두지 않는다 — `.memory/MEMORY.md` 토픽 파일에 있다. 1순위 = [[feedback_tmuxify_rendering_pipeline]] (렌더버그 카탈로그 + try_send 트랩). 코드 만지기 전 관련 토픽을 먼저 recall 할 것.
